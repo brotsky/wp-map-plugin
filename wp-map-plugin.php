@@ -26,11 +26,12 @@ class Brotsky_store_location_admin {
 	function Brotsky_store_location_admin() {
 		add_action( 'admin_menu', array(__CLASS__, 'config_page_init') );
 		if(is_admin()) {
+    		$key = $GLOBALS['brotsky_store_locator']['google_maps_api'];
     		
     		wp_enqueue_script('jquery-ui-core');
 			wp_enqueue_script('jquery-ui-autocomplete');	
     		
-			wp_enqueue_script('gmap_api', '//maps.google.com/maps/api/js?sensor=false', array('jquery'));
+			wp_enqueue_script('gmap_api', "//maps.googleapis.com/maps/api/js?key=$key", array('jquery'));
 			wp_enqueue_script( 'brotsky_store_locator_admin', plugin_dir_url( __FILE__ ).'/js/admin.js');	
 			
 			wp_enqueue_style( 'brotsky_store_locator_admin', plugin_dir_url( __FILE__ ).'/css/admin.css' );		
@@ -60,6 +61,56 @@ function create_brotsky_map_location_post_type() {
     )
   );
 }
+
+
+add_action( 'init', 'create_brotsky_map_location_taxonomies', 0 );
+
+// create two taxonomies, genres and writers for the post type "book"
+function create_brotsky_map_location_taxonomies() {
+	// Add new taxonomy, make it hierarchical (like categories)
+	$labels = array(
+		'name'              => _x( 'Categories', 'taxonomy general name', 'textdomain' ),
+		'singular_name'     => _x( 'Category', 'taxonomy singular name', 'textdomain' ),
+		'search_items'      => __( 'Search Categories', 'textdomain' ),
+		'all_items'         => __( 'All Categories', 'textdomain' ),
+		'parent_item'       => __( 'Parent Category', 'textdomain' ),
+		'parent_item_colon' => __( 'Parent Category:', 'textdomain' ),
+		'edit_item'         => __( 'Edit Category', 'textdomain' ),
+		'update_item'       => __( 'Update Category', 'textdomain' ),
+		'add_new_item'      => __( 'Add New Category', 'textdomain' ),
+		'new_item_name'     => __( 'New Category Name', 'textdomain' ),
+		'menu_name'         => __( 'Category', 'textdomain' ),
+	);
+
+	$args = array(
+		'hierarchical'      => true,
+		'labels'            => $labels,
+		'show_ui'           => true,
+		'show_admin_column' => true,
+		'query_var'         => true,
+		'rewrite'           => array( 'slug' => 'category' ),
+	);
+
+	register_taxonomy( 'category', array( 'brotsky_map_location' ), $args );
+}
+
+
+function prop_user_to_add_Google_Maps_API_key_notice() {
+    
+    $key = $GLOBALS['brotsky_store_locator']['google_maps_api'];
+    
+    $url = get_admin_url() . "admin.php?page=brotsky_store_locator&tab=2";
+    
+    
+    if($key == false || $key == "") {
+    ?>
+    <div class="notice notice-error is-dismissible">
+        <p><?php _e( "Please add a Google Maps API Key to the <a href='$url'>Brotsky Map Locator Settings Page</a>", 'brotsky_store_locator' ); ?></p>
+    </div>
+    <?php
+    }
+}
+add_action( 'admin_notices', 'prop_user_to_add_Google_Maps_API_key_notice' );
 
 function brotsky_meta_box_markup($object)
 {
@@ -94,7 +145,19 @@ function brotsky_meta_box_markup($object)
                 </tr>
                 <tr>
                     <th></th>
-                    <td id="google-maps-image"><?php if($lat && $lng) { ?><img src="http://maps.google.com/maps/api/staticmap?center=<?php echo $lat; ?>,<?php echo $lng; ?>&zoom=15&size=300x200&markers=color:red|<?php echo $lat; ?>,<?php echo $lng; ?>&sensor=false"><?php } ?></td>
+                    <td id="google-maps-image"><?php if($lat && $lng) { ?><img src="//maps.google.com/maps/api/staticmap?center=<?php echo $lat; ?>,<?php echo $lng; ?>&zoom=15&size=300x200&markers=color:red|<?php echo $lat; ?>,<?php echo $lng; ?>&sensor=false"><?php } ?></td>
+                </tr>
+                <tr>
+                    <th>Phone Number</th>
+                    <td><input type="text" id="brotsky-location-phone" name="brotsky-location-phone" value="<?php echo get_post_meta($object->ID, "brotsky-location-phone", true); ?>"></td>
+                </tr>
+                <tr>
+                    <th>Email</th>
+                    <td><input type="text" id="brotsky-location-email" name="brotsky-location-email" value="<?php echo get_post_meta($object->ID, "brotsky-location-email", true); ?>"></td>
+                </tr>
+                <tr>
+                    <th>Website</th>
+                    <td><input type="text" id="brotsky-location-website" name="brotsky-location-website" value="<?php echo get_post_meta($object->ID, "brotsky-location-website", true); ?>"></td>
                 </tr>
             </table>
         
@@ -123,7 +186,7 @@ function brotsky_meta_box_markup($object)
     			$('#brotsky-location-lng').val(lng);
     			$('#brotsky-location-address').val(address);
     			$('#address_display').html(address);
-    			var img = '<img src="http://maps.google.com/maps/api/staticmap?center='+lat+','+lng+'&zoom=15&size=300x200&markers=color:red|'+lat+','+lng+'&sensor=false">';
+    			var img = '<img src="//maps.google.com/maps/api/staticmap?center='+lat+','+lng+'&zoom=15&size=300x200&markers=color:red|'+lat+','+lng+'&sensor=false">';
     			$('#google-maps-image').html(img);
     		}
     	});
@@ -155,7 +218,7 @@ function brotsky_location_save_post_class_meta( $post_id, $post ) {
   if ( !current_user_can( $post_type->cap->edit_post, $post_id ) )
     return $post_id;
 
-    $fields = array("brotsky-location-address","brotsky-location-lat","brotsky-location-lng");
+    $fields = array("brotsky-location-address","brotsky-location-lat","brotsky-location-lng","brotsky-location-phone","brotsky-location-email","brotsky-location-website");
 
     foreach($fields as $field) {
         $new_meta_value = ( isset( $_POST[$field] ) ?  $_POST[$field]  : '' );
